@@ -84,29 +84,21 @@ namespace BuffKit
                     (Region r) =>
                         r.Public && r.GameMode.GetGameType() == mlv.Map.GameMode.GetGameType() &&
                         comparer.Equals(r.NonEmptyTeamSize, mlv.Map.NonEmptyTeamSize)
-                )
-                .OrderBy(m => m.GetLocalizedName());
-
-            Region[] maps;
+                );
+            
             if (mlv.Map.GameMode == RegionGameMode.TEAM_MELEE)
             {
-                maps = rawMaps.Where(m => m.GameMode == RegionGameMode.TEAM_MELEE)
-                    .Where(m => !m.Name.Equals("Batcave"))
-                    .ToArray();
+                rawMaps = rawMaps.Where(m => m.GameMode == RegionGameMode.TEAM_MELEE)
+                    .Where(m => !m.Name.Equals("Batcave"));
             }
             else if (mlv.Map.GameMode == RegionGameMode.TEAM_MELEE_VIP)
             {
-                maps = rawMaps.Where(m => m.GameMode == RegionGameMode.TEAM_MELEE_VIP)
-                    .Where(m => !m.Name.Equals("Batcave"))
-                    .ToArray();
-            }
-            else
-            {
-                maps = rawMaps.ToArray();
+                rawMaps = rawMaps.Where(m => m.GameMode == RegionGameMode.TEAM_MELEE_VIP);
             }
 
+            var maps = rawMaps.OrderBy(m => m.GetLocalizedName()).ToArray();
 
-            UINewModalDialog.Select("Select Map", "Current: " + mlv.Map.GetLocalizedName(),
+                UINewModalDialog.Select("Select Map", "Current: " + mlv.Map.GetLocalizedName(),
                 UINewModalDialog.DropdownSetting.CreateSetting(maps,
                     r => "{0} ({1})".F(r.GetLocalizedName(), r.GameMode.GetString())), delegate(int index)
                 {
