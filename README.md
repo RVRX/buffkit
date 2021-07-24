@@ -1,8 +1,8 @@
 # Buff Kit
-Guns of Icarus modding toolkit/moderation mod/gond knows what in the future
+Guns of Icarus modding toolkit/moderation mod/god knows what in the future
 
 ## Building and installing
-Open the solution in an IDE of choice  
+Open the solution in your IDE of choice  
 Build Spanner  
 Copy Spanner.exe to Steam/steamapps/common/Guns of Icarus Online/GunsOfIcarusOnline_Data/Managed/  
 Drag-and-drop the Assembly-CSharp.dll onto the Spanner executable  
