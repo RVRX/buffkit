@@ -80,8 +80,6 @@ namespace Spanner
             if(type.IsNested)
             {
                 type.Attributes &= ~TypeAttributes.NestedPrivate;
-                // type.Attributes &= ~TypeAttributes.NestedAssembly;
-                // type.Attributes &= ~TypeAttributes.NestedFamily;
                 type.Attributes |= TypeAttributes.NestedPublic;
             }
             else
@@ -89,16 +87,16 @@ namespace Spanner
                 type.Attributes |= TypeAttributes.Public;
             }
 
-            if (type.HasFields)
-            {
-                foreach (var field in type.Fields)
-                {
-                    field.Attributes &= ~FieldAttributes.Private;
+            // if (type.HasFields)
+            // {
+                // foreach (var field in type.Fields)
+                // {
+                    // field.Attributes &= ~FieldAttributes.Private;
                     // field.Attributes &= ~FieldAttributes.Family;
                     // field.Attributes &= ~FieldAttributes.Assembly;
-                    field.Attributes |= FieldAttributes.Public;
-                }
-            }
+                    // field.Attributes |= FieldAttributes.Public;
+                // }
+            // }
             
             if (type.HasMethods)
             {
