@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Collections;
-using MuseBase.Multiplayer.Unity;
 using UnityEngine;
-using Logger = BepInEx.Logging.Logger;
+using static BuffKit.Util;
 
 namespace BuffKit
 {
     public class LobbyTimer : MonoBehaviour
     {
-        private static readonly int count = 8;
-        private static readonly int period = 30;
-        private static readonly int overtimeDuration = 60;
-        private int _secondsLeft = count * period;
+        private const int Count = 8;
+        private const int Period = 30;
+        private const int OvertimeDuration = 60;
+        private int _secondsLeft = Count * Period;
         private bool _active = false;
         public bool FirstStart = true;
         public bool Overtime = false;
@@ -23,27 +22,28 @@ namespace BuffKit
             {
                 if (_active && value) return;
                 _active = value;
+                if (!_active) return;
 
-                if (!FirstStart && _active)
+                if (FirstStart)
                 {
-                    MuseWorldClient.Instance.ChatHandler.TrySendMessage("TIMER: Timer restarting!", "match");
-                }
-
-                if (FirstStart && _active)
-                {
-                    MuseWorldClient.Instance.ChatHandler.TrySendMessage("TIMER: Timer starting!", "match");
+                    TrySendMessage("TIMER: Timer starting!", "match");
                     FirstStart = false;
+                    
+                }
+                else
+                {
+                    TrySendMessage("TIMER: Timer restarting!", "match");
                 }
             }
         }
 
         public void Run()
         {
-            StartCoroutine(Count());
+            StartCoroutine(RunTimer());
         }
 
 
-        private IEnumerator Count()
+        private IEnumerator RunTimer()
         {
             while (_secondsLeft >= 0)
             {
@@ -51,44 +51,54 @@ namespace BuffKit
                 {
                     if (!FirstStart)
                     {
-                        MuseWorldClient.Instance.ChatHandler.TrySendMessage("TIMER: Timer paused!", "match");
+                        TrySendMessage("TIMER: Timer paused!", "match");
                     }
 
                     yield return new WaitUntil(() => Active);
                 }
 
-                if (_secondsLeft % period == 0)
+                if (_secondsLeft % Period == 0)
                 {
                     var t = TimeSpan.FromSeconds(_secondsLeft);
                     var f = $"{t.Minutes:D1}:{t.Seconds:D2}";
-                    MuseWorldClient.Instance.ChatHandler.TrySendMessage($"TIMER: {f} remaining", "match");
+                    TrySendMessage($"TIMER: {f} remaining", "match");
                 }
 
-                if (_secondsLeft == 0 && !Overtime)
+                if (_secondsLeft > 0)
                 {
-                    MuseWorldClient.Instance.ChatHandler.TrySendMessage(
-                        "TIMER: Timer is over, please ready up or request overtime", "match");
+                    _secondsLeft--;
+                    yield return new WaitForSeconds(1);
+                    continue;
+                }
+
+                if (!Overtime)
+                {
+                    TrySendMessage("TIMER: Timer is over, please ready up or request overtime", "match");
+                    
                     Overtime = true;
-                    _active = false;
                     FirstStart = true;
-                    BuffKit.CoolerFooterButtons();
+                    _active = false;
+                    
+                    BuffKit.PaintFooterButtons();
+                    
                     yield return new WaitUntil(() => Active);
-                    _secondsLeft = overtimeDuration + 1;
+                    
+                    _secondsLeft = OvertimeDuration;
+                    continue;
                 }
 
-                if (_secondsLeft == 0 && Overtime)
+                if (Overtime)
                 {
-                    MuseWorldClient.Instance.ChatHandler.TrySendMessage("TIMER: Overtime is over, please ready up",
-                        "match");
+                    TrySendMessage("TIMER: Overtime is over, please ready up", "match");
+                    
                     _active = false;
                     Overtime = false;
                     FirstStart = true;
-                    BuffKit.CoolerFooterButtons();
+                    
+                    BuffKit.PaintFooterButtons();
+                    
                     yield break;
                 }
-
-                _secondsLeft--;
-                yield return new WaitForSeconds(1);
             }
         }
     }

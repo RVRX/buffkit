@@ -4,6 +4,7 @@ using BepInEx;
 using HarmonyLib;
 using Muse.Common;
 using Muse.Goi2.Entity;
+using static BuffKit.Util;
 using static UIManager;
 
 namespace BuffKit
@@ -11,8 +12,6 @@ namespace BuffKit
     [BepInPlugin("me.trgk.buffkit", "Buff Kit", "0.0.1")]
     public class BuffKit : BaseUnityPlugin
     {
-        public static LobbyTimer _lobbyTimer;
-
         void Awake()
         {
             var log = BepInEx.Logging.Logger.CreateLogSource("buffkit");
@@ -24,69 +23,58 @@ namespace BuffKit
             var mlsType = asm.GetTypes().First(t => t.Name.Equals("UINewMatchLobbyState"));
 
             var modFeaturesOriginal = mmsType.GetMethods().First(m => m.Name.Equals("ModFeatures"));
-            var modFeaturesPatch = typeof(BuffKit).GetMethods().First(m => m.Name.Equals("UINewMod"));
+            var modFeaturesPatch = typeof(BuffKit).GetMethods().First(m => m.Name.Equals("ModFeatures"));
             harmony.Patch(modFeaturesOriginal, new HarmonyMethod(modFeaturesPatch));
 
             var paintButtonsOriginal = mlsType.GetMethods().First(m => m.Name.Equals("PaintFooterButtons"));
-            var paintButtonsPatch = typeof(BuffKit).GetMethods().First(m => m.Name.Equals("CoolerFooterButtons"));
+            var paintButtonsPatch = typeof(BuffKit).GetMethods().First(m => m.Name.Equals("PaintFooterButtons"));
             harmony.Patch(paintButtonsOriginal, new HarmonyMethod(paintButtonsPatch));
 
             log.LogInfo("Buff applied!");
         }
 
-        public static bool UINewMod()
+        public static bool ModFeatures()
         {
-            TransitionToState(UIModMenuState.instance);
+            TransitionToState(UIModMenuState.Instance);
             return false;
         }
 
-        public static bool CoolerFooterButtons()
+        public static bool PaintFooterButtons()
         {
             var mlv = MatchLobbyView.Instance;
-            if (mlv != null && NetworkedPlayer.Local != null)
+            if (mlv == null || NetworkedPlayer.Local == null) return false;
+            
+            var footer = UIPageFrame.Instance.footer;
+            footer.ClearButtons();
+
+            if (!HasModPrivilege(mlv)) return false;
+            
+            var lobbyTimer = mlv.gameObject.GetComponent<LobbyTimer>();
+                    
+            var a = "START";
+            if (lobbyTimer != null && !lobbyTimer.FirstStart) a = lobbyTimer.Active ? "PAUSE" : "RESUME";
+
+            var b = "TIMER";
+            if (lobbyTimer != null && lobbyTimer.Overtime) b = "OVERTIME";
+                    
+            footer.AddButton($"{a} {b}", delegate
             {
-                var footer = UIPageFrame.Instance.footer;
-                footer.ClearButtons();
-                var a = "START";
-                if (mlv.Moderated && NetworkedPlayer.Local.Privilege >= UserPrivilege.Referee ||
-                    NetworkedPlayer.Local.Privilege.IsModerator())
+                if (lobbyTimer == null)
                 {
-                    if (_lobbyTimer == null || _lobbyTimer.FirstStart)
-                    {
-                        a = "START";
-                    }
-                    else if (_lobbyTimer.Active)
-                    {
-                        a = "PAUSE";
-                    }
-                    else if (!_lobbyTimer.Active)
-                    {
-                        a = "RESUME";
-                    }
-
-                    var b = _lobbyTimer == null ? "TIMER" : (_lobbyTimer.Overtime ? "OVERTIME" : "TIMER");
-                    footer.AddButton($"{a} {b}", delegate
-                    {
-                        if (_lobbyTimer == null)
-                        {
-                            _lobbyTimer = UIPageFrame.Instance.footer.gameObject.AddComponent<LobbyTimer>();
-                            _lobbyTimer.Run();
-                        }
-
-                        _lobbyTimer.Active = !_lobbyTimer.Active;
-                        CoolerFooterButtons();
-                    });
-
-                    footer.AddButton("CHANGE MAP", delegate { NewMapAct(); });
-
-                    footer.AddButton("MOD MATCH", delegate { UINewMatchLobbyState.instance.ModFeatures(); });
+                    lobbyTimer = mlv.gameObject.AddComponent<LobbyTimer>();
+                    lobbyTimer.Run();
                 }
-            }
+
+                lobbyTimer.Active = !lobbyTimer.Active;
+                PaintFooterButtons();
+            });
+            footer.AddButton("CHANGE MAP", delegate { PaintMapPicker(); });
+            footer.AddButton("MOD MATCH", delegate { UINewMatchLobbyState.instance.ModFeatures(); });
 
             return false;
         }
 
-        private static bool NewMapAct()
+        private static bool PaintMapPicker()
         {
             var comparer = new IntArrayEqualityComparer();
             var mlv = MatchLobbyView.Instance;
@@ -110,11 +98,7 @@ namespace BuffKit
                         LobbyActions.ChangeMap(maps[index].Id);
                     }
                 });
-            return false;
-        }
-
-        public static bool Nop()
-        {
+            
             return false;
         }
     }
