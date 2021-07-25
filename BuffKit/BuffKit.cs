@@ -1,5 +1,7 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Reflection;
+using System.Text;
 using BepInEx;
 using HarmonyLib;
 using Muse.Common;
@@ -43,31 +45,66 @@ namespace BuffKit
         {
             var mlv = MatchLobbyView.Instance;
             if (mlv == null || NetworkedPlayer.Local == null) return false;
-            
+
             var footer = UIPageFrame.Instance.footer;
             footer.ClearButtons();
 
             if (!HasModPrivilege(mlv)) return false;
-            
+
             var lobbyTimer = mlv.gameObject.GetComponent<LobbyTimer>();
-                    
-            var a = "START";
-            if (lobbyTimer != null && !lobbyTimer.FirstStart) a = lobbyTimer.Active ? "PAUSE" : "RESUME";
 
-            var b = "TIMER";
-            if (lobbyTimer != null && lobbyTimer.Overtime) b = "OVERTIME";
-                    
-            footer.AddButton($"{a} {b}", delegate
+            if (lobbyTimer == null)
             {
-                if (lobbyTimer == null)
-                {
-                    lobbyTimer = mlv.gameObject.AddComponent<LobbyTimer>();
-                    lobbyTimer.Run();
-                }
+                lobbyTimer = mlv.gameObject.AddComponent<LobbyTimer>();
+                lobbyTimer.Run();
+            }
 
+            var label = new StringBuilder();
+            Action action = () =>
+            {
                 lobbyTimer.Active = !lobbyTimer.Active;
                 PaintFooterButtons();
-            });
+            };
+
+            switch (lobbyTimer.CurrentState)
+            {
+                case LobbyTimer.State.Main:
+                    if (lobbyTimer.FirstStart)
+                        label.Append("START");
+                    else 
+                        label.Append(lobbyTimer.Active ? "PAUSE" : "RESUME");
+                    
+                    label.Append(" TIMER");
+                    break;
+                case LobbyTimer.State.LoadoutSetup:
+                    label.Append("START OVERTIME");
+                    action = () =>
+                    {
+                        lobbyTimer.StartOvertime();
+                        PaintFooterButtons();
+                    };
+                    break;
+                case LobbyTimer.State.Overtime:
+                    if (lobbyTimer.FirstStart)
+                        label.Append("START");
+                    else 
+                        label.Append(lobbyTimer.Active ? "PAUSE" : "RESUME");
+                    
+                    label.Append(" OVERTIME");
+                    break;
+                case LobbyTimer.State.OvertimeLoadoutSetup:
+                    label.Append("UNIMPLEMENTED");
+                    action = () =>
+                    {
+                    };
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
+            footer.AddButton($"{label}", action);
+
+
             footer.AddButton("CHANGE MAP", delegate { PaintMapPicker(); });
             footer.AddButton("MOD MATCH", delegate { UINewMatchLobbyState.instance.ModFeatures(); });
 
@@ -85,7 +122,7 @@ namespace BuffKit
                         r.Public && r.GameMode.GetGameType() == mlv.Map.GameMode.GetGameType() &&
                         comparer.Equals(r.NonEmptyTeamSize, mlv.Map.NonEmptyTeamSize)
                 );
-            
+
             if (mlv.Map.GameMode == RegionGameMode.TEAM_MELEE)
             {
                 rawMaps = rawMaps.Where(m => m.GameMode == RegionGameMode.TEAM_MELEE)
@@ -98,7 +135,7 @@ namespace BuffKit
 
             var maps = rawMaps.OrderBy(m => m.GetLocalizedName()).ToArray();
 
-                UINewModalDialog.Select("Select Map", "Current: " + mlv.Map.GetLocalizedName(),
+            UINewModalDialog.Select("Select Map", "Current: " + mlv.Map.GetLocalizedName(),
                 UINewModalDialog.DropdownSetting.CreateSetting(maps,
                     r => "{0} ({1})".F(r.GetLocalizedName(), r.GameMode.GetString())), delegate(int index)
                 {
@@ -107,7 +144,7 @@ namespace BuffKit
                         LobbyActions.ChangeMap(maps[index].Id);
                     }
                 });
-            
+
             return false;
         }
     }
