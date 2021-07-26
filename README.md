@@ -1,21 +1,20 @@
 # Buff Kit
-Guns of Icarus modding toolkit/moderation mod/god knows what in the future
+Guns of Icarus modding toolkit/moderation mod
 
 ## Building and installing
-Open the solution in your IDE of choice  
-Build Spanner  
-Copy Spanner.exe to Steam/steamapps/common/Guns of Icarus Online/GunsOfIcarusOnline_Data/Managed/  
-Drag-and-drop the Assembly-CSharp.dll onto the Spanner executable  
-Back up the original Assembly-CSharp.dll  
-Rename Assembly-CSharp_patched.dll to Assembly-CSharp.dll  
+Clone the repo  
+Add the path to your game and the names of classes you want to patch to Binaries/spanner_config.toml  
+Run Binaries/Spanner.exe and check the log to make sure it ran without issues 
+
+Copy Assemblies/Assembly-CSharp.dll to [game folder]/GunsOfIcarusOnline_Data/Managed, overwriting the existing one
+
 Download BepInEx at https://github.com/BepInEx/BepInEx/releases/download/v5.4.13/BepInEx_x86_5.4.13.0.zip  
 Extract the BepInEx archive into Steam/steamapps/common/Guns of Icarus Online/  
 Rename winhttp.dll to version.dll  
-Run the game to make it generate all the BepInEx stuff, then close it  
-Open the BuffKit project  
-Change the assemblies to the ones in Guns of Icarus Online/GunsOfIcarusOnline_Data/Managed/ and Guns of Icarus Online/BepInEx/core/  
-Build BuffKit  
-Copy BuffKit.dll to Guns of Icarus Online/BepInEx/plugins/  
-Start the game and cry tears of joy
+Run the game to make it generate all the BepInEx stuff, then close it
 
-Very simple, as you can see
+Open the BuffKit project  
+Build BuffKit  
+Copy BuffKit.dll to Guns of Icarus Online/BepInEx/plugins/
+
+Start the game and enjoy the fruits of your labour
