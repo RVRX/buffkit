@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Mono.Cecil;
 using Serilog;
 using Serilog.Core;
@@ -13,27 +14,34 @@ namespace Spanner
 {
     static class Program
     {
-        
-        private static readonly Logger Logger = new LoggerConfiguration()
-            .WriteTo.Console(
-                theme: AnsiConsoleTheme.Code,
-                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
-            )
-            .WriteTo.File(
-                path: Path.Combine(AppContext.BaseDirectory, "spanner_log.txt"),
-                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
-            )
-            .MinimumLevel.Debug()
-            .CreateLogger();
+
+        private static Logger _logger;
         
         static void Main(string[] args)
         {
-            File.Delete("spanner_log.txt");
-            Logger.Information("Spanner started");
-            Logger.Information("Parsing config");
+            var logPath = Path.Combine(AppContext.BaseDirectory, "spanner_log.txt");
+            if (File.Exists(logPath)) File.Delete(logPath);
+            
+            var configPath = Path.Combine(AppContext.BaseDirectory, "spanner_config.toml");
+            _logger = new LoggerConfiguration()
+                .WriteTo.Console(
+                    theme: AnsiConsoleTheme.Code,
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+                )
+                .WriteTo.File(
+                    path: Path.Combine(AppContext.BaseDirectory, logPath),
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+                )
+                .MinimumLevel.Debug()
+                .CreateLogger();
+            
+            
+
+            _logger.Information("Spanner started");
+            _logger.Information("Parsing config");
             
             TomlTable configData;
-            using (var reader = File.OpenText("spanner_config.toml"))
+            using (var reader = File.OpenText(configPath))
             {
                 try
                 {
@@ -42,46 +50,46 @@ namespace Spanner
                 }
                 catch (Exception e)
                 {
-                    Logger.Fatal("Unable to parse the configuration file", e);
+                    _logger.Fatal("Unable to parse the configuration file", e);
                     return;
                 }
             }
 
-            Logger.Information("Looking up the game directory");
+            _logger.Information("Looking up the game directory");
             var gamePath = configData["game_path"];
             if (!Directory.Exists(gamePath))
             {
-                Logger.Fatal("The specified game directory doesn't exist");
+                _logger.Fatal("The specified game directory doesn't exist");
                 return;
             }
             
-            Logger.Information("Looking up the game assembly directory");
+            _logger.Information("Looking up the game assembly directory");
             var gameAssemblyPath = Path.Combine(gamePath, "GunsOfIcarusOnline_Data", "Managed");
             if (!Directory.Exists(gameAssemblyPath))
             {
-                Logger.Fatal("The specified game directory doesn't contain an assembly folder");
+                _logger.Fatal("The specified game directory doesn't contain an assembly folder");
                 return;
             }
 
-            Logger.Information("Looking up the project assembly directory");
+            _logger.Information("Looking up the project assembly directory");
             string projectAssemblyPath;
             try
             {
                 projectAssemblyPath = Path.Combine(
-                    Directory.GetParent(
-                            Directory.GetCurrentDirectory()
-                        )
-                        ?.ToString() ?? throw new IOException("Can't get the parent directory"),
+                    //If the directory name ends in separator, Directory.GetParent just returns it without the separator 
+                    Directory.GetParent(Directory.GetParent(
+                        AppContext.BaseDirectory
+                    ).ToString())?.ToString() ?? throw new IOException("Can't get the parent directory"),
                     "Assemblies"
                 );
             }
             catch (IOException e)
             {
-                Logger.Fatal("Can't get the parent directory\n{e}", e);
+                _logger.Fatal("Can't get the parent directory\n{e}", e);
                 return;
             }
 
-            Logger.Information("Copying the game assemblies if needed");
+            _logger.Information("Copying the game assemblies if needed");
             var assemblies = Directory.GetFiles(gameAssemblyPath);
             foreach (var assembly in assemblies)
             {
@@ -91,7 +99,7 @@ namespace Spanner
                 if (!File.Exists(dest))
                 {
                     File.Copy(assembly, dest);
-                    Logger.Information($"Copied {name} to {dest}");
+                    _logger.Information($"Copied {name} to {dest}");
                 }
             }
 
@@ -103,10 +111,10 @@ namespace Spanner
             
             if (!File.Exists(patchedAssemblyPath))
             {
-                Logger.Information("Backing up the main assembly");
+                _logger.Information("Backing up the main assembly");
                 if (!File.Exists(vanillaAssemblyPath))
                 {
-                    Logger.Fatal("The main assembly doesn't exist in the project's Assemblies folder");
+                    _logger.Fatal("The main assembly doesn't exist in the project's Assemblies folder");
                     return;
                 }
 
@@ -115,23 +123,23 @@ namespace Spanner
                     File.Copy(vanillaAssemblyPath, backupPath);
                     vanillaAssemblyPath = backupPath;
                     patchedAssemblyPath = basePath;
-                    Logger.Information("Backed up the original assembly");
+                    _logger.Information("Backed up the original assembly");
                 }
                 catch (Exception e)
                 {
-                    Logger.Fatal("Unable to backup the original assembly\n{e}", e);
+                    _logger.Fatal("Unable to backup the original assembly\n{e}", e);
                     return;
                 }
             }
 
-            Logger.Information("Reading the main assembly");
+            _logger.Information("Reading the main assembly");
             var resolver = new DefaultAssemblyResolver();
             resolver.AddSearchDirectory(projectAssemblyPath);
             var assemblyToPatch = AssemblyDefinition.ReadAssembly(
                 vanillaAssemblyPath, 
                 new ReaderParameters {AssemblyResolver = resolver});
             
-            Logger.Information("Patching the main assembly");
+            _logger.Information("Patching the main assembly");
             var classesToPatch = configData["classes_to_patch"].AsArray;
             foreach (var ctp in classesToPatch)
             {
@@ -141,30 +149,30 @@ namespace Spanner
                 var type = assemblyToPatch.MainModule.Types.FirstOrDefault(t => t.Name.Equals(name));
                 if (type is null)
                 {
-                    Logger.Error($"Unable to find the specified class {name}");
+                    _logger.Error($"Unable to find the specified class {name}");
                     continue;
                 }
                 
                 Nationalize(type);
-                Logger.Information($"Patched {name}");
+                _logger.Information($"Patched {name}");
             }
 
-            Logger.Information("Writing changes to the main assembly");
+            _logger.Information("Writing changes to the main assembly");
             try
             {
                 assemblyToPatch.Write(patchedAssemblyPath);
             }
             catch (Exception e)
             {
-                Logger.Fatal("Unable to write the changes to the main assembly\n{e}", e);
+                _logger.Fatal("Unable to write the changes to the main assembly\n{e}", e);
                 return;
             }
-            Logger.Information("Rebuild finished, spanner shutting down");
+            _logger.Information("Rebuild finished, spanner shutting down");
         }
 
         private static void Nationalize(TypeDefinition type)
         {
-            Logger.Information($"Deprivatizing class {type.FullName}");
+            _logger.Information($"Deprivatizing class {type.FullName}");
             
             if(type.IsNested)
             {
@@ -194,7 +202,7 @@ namespace Spanner
         private static void Nationalize(MethodDefinition method)
         {
             if (method.IsPublic) return;
-            Logger.Debug($"Deprivatizing method {method.FullName}");
+            _logger.Debug($"Deprivatizing method {method.FullName}");
             
             method.Attributes &= ~MethodAttributes.Private;
             method.Attributes |= MethodAttributes.Public;
